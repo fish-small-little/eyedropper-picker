@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "取色器 · EyeDropper Picker",
+  "version": "1.0.0",
+  "description": "一键吸取屏幕上任意位置的颜色，自动复制 HEX / RGB 色值。纯本地运行，不上传任何数据。",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_title": "取色器 · 点击开始取色",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>取色器 · EyeDropper Picker | 一键吸取屏幕颜色</title>
+<meta name="description" content="基于 Manifest V3 的浏览器取色插件，一键吸取屏幕上任意位置的颜色，自动复制 HEX / RGB 色值。纯本地运行，不上传任何数据。" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1115;
+    --panel: #161a20;
+    --panel-2: #1d232b;
+    --border: #262c35;
+    --text: #e8ebf0;
+    --dim: #8d97a5;
+    --accent: #f5a524;
+    --ok: #2fbf9b;
+    --radius: 14px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* 背景里的柔和光斑，不使用蓝紫渐变 */
+  body::before {
+    content: "";
+    position: fixed;
+    top: -220px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(245, 165, 36, 0.10) 0%, rgba(245, 165, 36, 0) 68%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ===== 导航 ===== */
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 0;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: .3px; }
+
+  .brand .mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: rgba(245, 165, 36, .12);
+    display: grid; place-items: center;
+    color: var(--accent);
+  }
+
+  .brand svg { width: 18px; height: 18px; }
+
+  nav .links { margin-left: auto; display: flex; gap: 22px; align-items: center; }
+
+  nav a {
+    color: var(--dim); text-decoration: none; font-size: 13.5px;
+    transition: color .15s;
+  }
+
+  nav a:hover { color: var(--text); }
+
+  /* ===== Hero ===== */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 56px;
+    align-items: center;
+    padding: 56px 0 72px;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--dim);
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 100px;
+    margin-bottom: 20px;
+  }
+
+  .badge i {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok); display: block;
+  }
+
+  h1 {
+    font-size: 44px;
+    line-height: 1.22;
+    letter-spacing: -1px;
+    font-weight: 700;
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+
+  .lead {
+    margin-top: 18px;
+    color: var(--dim);
+    font-size: 15.5px;
+    max-width: 460px;
+  }
+
+  .actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px;
+    border-radius: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .18s;
+    border: 1px solid transparent;
+  }
+
+  .btn.primary { background: var(--accent); color: #1a1206; }
+  .btn.primary:hover { background: #ffb84d; transform: translateY(-1px); }
+
+  .btn.ghost {
+    background: transparent; color: var(--text); border-color: var(--border);
+  }
+  .btn.ghost:hover { border-color: #39414d; background: var(--panel); }
+
+  .btn svg { width: 16px; height: 16px; }
+
+  .meta { margin-top: 26px; display: flex; gap: 26px; flex-wrap: wrap; color: var(--dim); font-size: 12.5px; }
+  .meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .meta b { color: var(--text); font-weight: 600; }
+
+  /* ===== 插件界面模拟 ===== */
+  .mockup {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+    transform: perspective(1000px) rotateY(-6deg) rotateX(3deg);
+    transition: transform .5s ease;
+  }
+
+  .mockup:hover { transform: perspective(1000px) rotateY(0) rotateX(0); }
+
+  .mock-head { display: flex; align-items: center; gap: 9px; padding-bottom: 13px; border-bottom: 1px solid var(--border); }
+  .mock-head .dot { width: 26px; height: 26px; border-radius: 8px; background: rgba(245,165,36,.12); color: var(--accent); display: grid; place-items: center; }
+  .mock-head .dot svg { width: 14px; height: 14px; }
+  .mock-head strong { font-size: 13px; display: block; line-height: 1.3; }
+  .mock-head small { font-size: 10.5px; color: var(--dim); }
+
+  .mock-swatch {
+    height: 92px; border-radius: 11px; margin-top: 14px;
+    background: #f5a524;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 14px; letter-spacing: 1.4px;
+    color: #1a1206;
+  }
+
+  .mock-values { margin-top: 12px; display: grid; gap: 9px; }
+  .mock-row { display: flex; align-items: center; gap: 10px; }
+  .mock-row small { width: 34px; font-size: 10px; letter-spacing: .8px; color: var(--dim); font-weight: 700; }
+  .mock-row code {
+    font-family: "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-size: 12.5px;
+  }
+
+  .mock-btn {
+    margin-top: 14px; height: 40px; border-radius: 10px;
+    background: var(--accent); color: #1a1206;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700;
+  }
+
+  .mock-tip { margin-top: 10px; text-align: center; font-size: 11px; color: var(--ok); }
+
+  /* ===== 色带装饰 ===== */
+  .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin: 0 0 72px; }
+  .palette div { height: 46px; border-radius: 9px; border: 1px solid rgba(255,255,255,.06); }
+
+  /* ===== 通用区块 ===== */
+  section { padding: 60px 0; }
+
+  .sec-head { text-align: center; max-width: 620px; margin: 0 auto 44px; }
+  .sec-head h2 { font-size: 28px; letter-spacing: -.5px; font-weight: 700; }
+  .sec-head p { color: var(--dim); margin-top: 10px; font-size: 14.5px; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 20px;
+    transition: border-color .2s, transform .2s;
+  }
+
+  .card:hover { border-color: #39414d; transform: translateY(-2px); }
+
+  .card .ico {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(245,165,36,.1); color: var(--accent);
+    display: grid; place-items: center; margin-bottom: 14px;
+  }
+  .card .ico svg { width: 18px; height: 18px; }
+  .card h3 { font-size: 14.5px; font-weight: 650; margin-bottom: 7px; }
+  .card p { font-size: 13px; color: var(--dim); line-height: 1.65; }
+
+  /* ===== 使用步骤 ===== */
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; counter-reset: step; }
+
+  .step {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 26px 20px 22px;
+  }
+
+  .step::before {
+    counter-increment: step;
+    content: "0" counter(step);
+    position: absolute;
+    top: -13px; left: 20px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    padding: 2px 9px;
+    border-radius: 6px;
+  }
+
+  .step h3 { font-size: 14px; margin: 6px 0 8px; }
+  .step p { font-size: 12.8px; color: var(--dim); }
+  .step code {
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 5px;
+    font-family: Consolas, monospace; font-size: 12px; color: var(--text);
+  }
+
+  /* ===== FAQ ===== */
+  .faq { max-width: 760px; margin: 0 auto; display: grid; gap: 12px; }
+
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+
+  details[open] { border-color: #39414d; }
+
+  summary {
+    cursor: pointer;
+    font-size: 13.8px;
+    font-weight: 600;
+    list-style: none;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--accent); font-size: 17px; font-weight: 400; }
+  details[open] summary::after { content: "−"; }
+
+  details p { margin-top: 11px; color: var(--dim); font-size: 13px; }
+
+  /* ===== 页脚 ===== */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 34px 0 44px;
+    margin-top: 40px;
+  }
+
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .foot p { color: var(--dim); font-size: 12.5px; }
+  .foot a { color: var(--dim); text-decoration: none; font-size: 12.5px; }
+  .foot a:hover { color: var(--accent); }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; padding: 36px 0 56px; }
+    h1 { font-size: 34px; }
+    .mockup { transform: none; }
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+    .palette { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 0 18px; }
+    nav .links { display: none; }
+    h1 { font-size: 28px; }
+    .lead { font-size: 14px; }
+    .grid, .steps { grid-template-columns: 1fr; }
+    section { padding: 44px 0; }
+    .sec-head h2 { font-size: 22px; }
+    .actions { flex-direction: column; align-items: stretch; }
+    .actions .btn { width: 100%; justify-content: center; }
+    .meta { gap: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- 导航 -->
+  <nav>
+    <div class="brand">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 3.5 20.5 9.5" />
+          <path d="M17.5 6.5 8.2 15.8a3 3 0 0 0-.8 1.5L7 20l2.7-.4a3 3 0 0 0 1.5-.8l9.3-9.3" />
+          <path d="M5.2 21.5c1.2-.5 2.2-1.5 2.7-2.7" />
+        </svg>
+      </span>
+      取色器 · EyeDropper Picker
+    </div>
+    <div class="links">
+      <a href="#features">功能</a>
+      <a href="#usage">安装</a>
+      <a href="#faq">问答</a>
+      <a href="./eyedropper-picker.zip">下载</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div>
+      <div class="badge"><i></i> Manifest V3 · 纯本地运行</div>
+      <h1>看见什么颜色<br />就吸<em>什么颜色</em></h1>
+      <p class="lead">
+        点开插件、按下按钮，鼠标会变成十字准星。单击屏幕上任意位置，
+        立刻拿到 HEX 与 RGB 色值，并自动复制到剪贴板。取色全过程在浏览器本地完成，不联网、不上传、不留痕。
+      </p>
+
+      <div class="actions">
+        <a class="btn primary" href="./eyedropper-picker.zip" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <path d="M7 10l5 5 5-5" />
+            <path d="M12 15V3" />
+          </svg>
+          下载插件（ZIP）
+        </a>
+        <a class="btn ghost" href="#usage">查看安装步骤</a>
+      </div>
+
+      <div class="meta">
+        <span>支持 <b>Chrome 95+</b></span>
+        <span>权限仅 <b>activeTab</b></span>
+        <span>体积 <b>小于 30 KB</b></span>
+      </div>
+    </div>
+
+    <!-- 插件界面模拟 -->
+    <div class="mockup" aria-hidden="true">
+      <div class="mock-head">
+        <span class="dot">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 3.5 20.5 9.5" />
+            <path d="M17.5 6.5 8.2 15.8a3 3 0 0 0-.8 1.5L7 20l2.7-.4a3 3 0 0 0 1.5-.8l9.3-9.3" />
+          </svg>
+        </span>
+        <div>
+          <strong>取色器</strong>
+          <small>EyeDropper Picker</small>
+        </div>
+      </div>
+
+      <div class="mock-swatch">#F5A524</div>
+
+      <div class="mock-values">
+        <div class="mock-row"><small>HEX</small><code>#F5A524</code></div>
+        <div class="mock-row"><small>RGB</small><code>rgb(245, 165, 36)</code></div>
+      </div>
+
+      <div class="mock-btn">开始取色</div>
+      <div class="mock-tip">已复制到剪贴板</div>
+    </div>
+  </header>
+
+  <!-- 色带 -->
+  <div class="palette" aria-hidden="true">
+    <div style="background:#F5A524"></div>
+    <div style="background:#2FBF9B"></div>
+    <div style="background:#E15A4B"></div>
+    <div style="background:#4C8DD8"></div>
+    <div style="background:#8E6BD1"></div>
+    <div style="background:#D8CFA8"></div>
+    <div style="background:#3B4450"></div>
+    <div style="background:#ECEFF3"></div>
+  </div>
+</div>
+
+<!-- 功能 -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>四个功能，只做取色这一件事</h2>
+      <p>没有账号、没有历史记录、没有后台请求，装上就能用。</p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <span class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 3.5 20.5 9.5" />
+            <path d="M17.5 6.5 8.2 15.8a3 3 0 0 0-.8 1.5L7 20l2.7-.4a3 3 0 0 0 1.5-.8l9.3-9.3" />
+          </svg>
+        </span>
+        <h3>系统级取色</h3>
+        <p>调用浏览器原生 EyeDropper API，可以直接吸取屏幕上任意位置的颜色，包括图片、视频与其他窗口。</p>
+      </div>
+
+      <div class="card">
+        <span class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="11" height="11" rx="2" />
+            <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+          </svg>
+        </span>
+        <h3>自动复制</h3>
+        <p>取色成功后立刻把 HEX 色值写进剪贴板，切回代码里直接 <code>Ctrl+V</code> 就能用。</p>
+      </div>
+
+      <div class="card">
+        <span class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v18" /><path d="M3 12h18" />
+            <circle cx="12" cy="12" r="9" />
+          </svg>
+        </span>
+        <h3>HEX + RGB</h3>
+        <p>同时给出两种色值格式，并带一块颜色预览，方便快速判断对比度与明暗。</p>
+      </div>
+
+      <div class="card">
+        <span class="ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="10" width="16" height="10" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+        </span>
+        <h3>零数据外传</h3>
+        <p>不申请任何网络权限，不写本地存储，取完色即结束。唯一权限是 activeTab。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 安装步骤 -->
+<section id="usage">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>四步装好，一分钟用上</h2>
+      <p>当前为开发者模式安装，下载 ZIP 后解压即可。</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <h3>下载并解压</h3>
+        <p>点<a href="./eyedropper-picker.zip" style="color:var(--accent)">这里下载 ZIP</a>，解压成一个文件夹，记住路径。</p>
+      </div>
+      <div class="step">
+        <h3>打开扩展页</h3>
+        <p>Chrome 地址栏输入 <code>chrome://extensions</code>，回车。</p>
+      </div>
+      <div class="step">
+        <h3>开启开发者模式</h3>
+        <p>右上角把「开发者模式」开关打开，会出现「加载已解压的扩展程序」。</p>
+      </div>
+      <div class="step">
+        <h3>选中文件夹</h3>
+        <p>点该按钮，选中解压出来的文件夹（里面有 <code>manifest.json</code> 那一层），完成。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>常见问题</h2>
+    </div>
+
+    <div class="faq">
+      <details>
+        <summary>为什么点「开始取色」会先弹出一个小窗口？</summary>
+        <p>
+          直接在小弹窗里调用 EyeDropper 时，浏览器会把焦点交给全屏取色层，
+          工具栏弹窗会被系统关闭，取色结果就取不回来了。所以插件改为打开一个独立小窗口来取色，
+          窗口不会消失，取完能立刻看到色值并自动复制。
+        </p>
+      </details>
+      <details>
+        <summary>支持哪些浏览器？</summary>
+        <p>
+          需要支持 EyeDropper API 的浏览器，也就是 Chrome 95+、Edge 95+ 及以上版本。
+          在旧版浏览器或不支持的浏览器里打开插件，会直接看到「浏览器不支持」提示，不会报错。
+        </p>
+      </details>
+      <details>
+        <summary>取色时可以取消吗？</summary>
+        <p>可以。取色状态下按 <code>ESC</code> 即可退出，插件会提示「已取消本次取色」，原有颜色不受影响。</p>
+      </details>
+      <details>
+        <summary>插件会上传我的数据吗？</summary>
+        <p>
+          不会。插件没有申请任何网络权限，也不使用 localStorage 或 chrome.storage，
+          所有逻辑都在本地弹窗里完成，取到的颜色用完即弃。
+        </p>
+      </details>
+      <details>
+        <summary>复制失败怎么办？</summary>
+        <p>
+          极少数情况下浏览器会拦截自动写入剪贴板。此时点击「复制色值」按钮手动复制即可，
+          两种方式写入的内容完全一致。
+        </p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <p>取色器 · EyeDropper Picker · 基于 Manifest V3 构建</p>
+    <a href="./eyedropper-picker.zip">下载插件 ZIP</a>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>取色器</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 顶部标题栏 -->
+    <header class="topbar">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 3.5 20.5 9.5" />
+          <path d="M17.5 6.5 8.2 15.8a3 3 0 0 0-.8 1.5L7 20l2.7-.4a3 3 0 0 0 1.5-.8l9.3-9.3" />
+          <path d="M5.2 21.5c1.2-.5 2.2-1.5 2.7-2.7" />
+        </svg>
+      </div>
+      <div class="titles">
+        <h1>取色器</h1>
+        <p>EyeDropper Picker</p>
+      </div>
+      <button id="closeBtn" class="icon-btn" title="关闭窗口" hidden>✕</button>
+    </header>
+
+    <!-- 主体 -->
+    <main class="body">
+      <!-- 模式提示：action 弹窗里提示会打开取色窗口 -->
+      <p class="sub-hint" id="subHint"></p>
+
+      <!-- 颜色预览区 -->
+      <section class="preview">
+        <div class="swatch" id="swatch">
+          <span class="swatch-text" id="swatchText">尚未取色</span>
+        </div>
+
+        <div class="values">
+          <div class="value-row">
+            <span class="label">HEX</span>
+            <code id="hexValue">—</code>
+          </div>
+          <div class="value-row">
+            <span class="label">RGB</span>
+            <code id="rgbValue">—</code>
+          </div>
+        </div>
+      </section>
+
+      <!-- 操作按钮 -->
+      <button id="pickBtn" class="btn primary" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.5 3.5 20.5 9.5" />
+          <path d="M17.5 6.5 8.2 15.8a3 3 0 0 0-.8 1.5L7 20l2.7-.4a3 3 0 0 0 1.5-.8l9.3-9.3" />
+        </svg>
+        <span id="pickBtnText">开始取色</span>
+      </button>
+
+      <button id="copyBtn" class="btn secondary" type="button" disabled>
+        复制色值
+      </button>
+
+      <!-- 状态 / 提示文字 -->
+      <p class="tip" id="tip">按 ESC 可随时取消取色</p>
+    </main>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
